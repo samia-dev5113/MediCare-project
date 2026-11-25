@@ -1,0 +1,74 @@
+﻿services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./init-db:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+
+  discovery-service:
+    build:
+      context: ./discovery-service
+    ports:
+      - "8761:8761"
+    restart: on-failure
+
+  config-service:
+    build:
+      context: ./config-service
+    ports:
+      - "9999:9999"
+    depends_on:
+      - discovery-service
+    restart: on-failure
+
+  patient-service:
+    env_file:
+      - .env
+    build:
+      context: ./patient-service
+    ports:
+      - "8081:8081"
+    depends_on:
+      - config-service
+      - postgres
+    restart: on-failure
+
+  appointment-service:
+    env_file:
+      - .env
+    build:
+      context: ./appointment-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      - patient-service
+      - postgres
+    restart: on-failure
+
+  gateway-service:
+    build:
+      context: ./gateway-service
+    ports:
+      - "8888:8888"
+    depends_on:
+      - appointment-service
+    restart: on-failure
+
+  medic-frontend:
+    build:
+      context: ../medic-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - gateway-service
+    restart: on-failure
+
+volumes:
+  postgres_data:
+
